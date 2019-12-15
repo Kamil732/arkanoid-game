@@ -73,20 +73,39 @@ class Ball(object):
 
             pg.draw.circle(surface, (self.color), (int(self.x), int(self.y)), self.radius)
 
-    def move(self, game_width, player):
+    def move(self, game_width):
         self.x += self.dirX # Ball speed X
         self.y += self.dirY # ball speed Y
-        if (self.x >= game_width or self.x <= 0): self.x = game_width//2
-        # Collsions
-        if (self.x <= self.radius or self.x >= game_width - self.radius): self.dirX = -self.dirX # Bouncing ball when it hit left or right wall
+        if (self.x + self.radius - 2 >= game_width): self.x -= 2
+        if (self.x - self.radius + 2 <= 0): self.x += 2
+
+    def isCollision(self, game, player):
+        if (self.x <= self.radius or self.x >= game.width - self.radius): self.dirX = -self.dirX # Bouncing ball when it hit left or right wall
         if (self.y <= self.radius): self.dirY = -self.dirY # Bouncing ball when it hit the celling
         if self.y >= player.y - self.radius and self.y <= player.y + player.height and self.x >= player.x - self.radius and self.x <= player.x + self.radius + player.width: # Bouncing ball when it hit the player
-            collidePoint = self.x - (player.x + player.width/2)
-            collidePoint = collidePoint / (player.width/2)
+            collidePoint = self.x - (game.player.x + game.player.width/2)
+            collidePoint = collidePoint / (game.player.width/2)
 
             angle = collidePoint * pi/3
             self.dirX = self.speed * sin(angle)
             self.dirY = - self.speed * cos(angle)
+
+        if self.y >= game.height + self.radius*2: # minus one live when ball hit the floor and reset the ball
+            if game.player.lives <= 1:
+                game.player.lives = 0
+                game.draw_texts(game.width//2 - 305//2, game.height//2 - 61//2, 'GAME OVER', (0,255,0), 'font.ttf', 50) # End game when lives == 0
+                game.draw_texts(game.width//2 - 140//2, game.height//2 + 25, 'YOU LOST', (255,0,0), 'font.ttf', 28)
+                game.end_game()
+            else:
+                self.dirY = -self.dirY
+                game.player.lives -= 1
+                self.x = game.width//2
+                self.y = game.height//2
+
+        if game.lvl == 5 and game.bricks == []: # Check win
+            game.draw_texts(game.width//2 - 305//2, game.height//2 - 61//2, 'GAME OVER', (0,255,0), 'font.ttf', 50)
+            game.draw_texts(game.width//2 - 123//2, game.height//2 + 25, 'YOU WON', (150,255,150), 'font.ttf', 28)
+            game.end_game()
 
 class Game:
     def __init__(self, width, height, player, ball, restartBtn):
@@ -132,24 +151,6 @@ class Game:
         self.ball.dirY *= -1
         self.bricks = [Brick(10, 60, 60, 15, (0,0,255)), Brick(20 + 60, 60, 60, 15, (0,0,255)), Brick(30 + 120, 60, 60, 15, (0,0,255)), Brick(40 + 180, 60, 60, 15, (0,0,255)), Brick(50 + 240, 60, 60, 15, (0,0,255))]
 
-    def checkFloorColision(self):
-        if self.ball.y >= self.height + self.ball.radius*2: # minus one live when ball hit the floor and reset the ball
-            if self.player.lives <= 1:
-                self.player.lives = 0
-                self.draw_texts(self.width//2 - 305//2, self.height//2 - 61//2, 'GAME OVER', (0,255,0), 'font.ttf', 50) # End game when lives == 0
-                self.draw_texts(self.width//2 - 140//2, self.height//2 + 25, 'YOU LOST', (255,0,0), 'font.ttf', 28)
-                self.end_game()
-            else:
-                self.ball.dirY = -self.ball.dirY
-                self.player.lives -= 1
-                self.ball.x = self.width//2
-                self.ball.y = self.height//2
-
-        if self.lvl == 5 and self.bricks == []: # Check win
-            self.draw_texts(self.width//2 - 305//2, self.height//2 - 61//2, 'GAME OVER', (0,255,0), 'font.ttf', 50)
-            self.draw_texts(self.width//2 - 123//2, self.height//2 + 25, 'YOU WON', (150,255,150), 'font.ttf', 28)
-            self.end_game()
-
     def redrawWidnow(self):
         self.win.fill((20,20,20)) # Draw background
         self.draw_texts(8, 6, 'SCORE: ' + str(self.score), (255,255,255), 'font.ttf', 18) # Draw score textt
@@ -157,9 +158,9 @@ class Game:
         self.draw_texts(8, self.height - 30, 'LIVES: ' + str(self.player.lives), (255,255,255), 'font.ttf', 18) # draw lives text
         self.player.draw(self.win, True, (100,100,255), 1) # Draw player
         self.ball.draw(self.win, True, (100,155,155), 1) # Draw ball
-        self.ball.move(self.width, self.player) # Ball move
+        self.ball.move(self.width) # Ball move
         self.player.move(self.width)
-        self.checkFloorColision()
+        self.ball.isCollision(self, self.player)
         for brick in self.bricks: # Draw bricks
             brick.draw(self.win, True, (255,255,255), 1)
         pg.display.update() # Show everything on the screen
@@ -217,7 +218,6 @@ if __name__ == '__main__':
                 run = False
                 pg.quit()
                 quit()
-
             if ev.type == pg.KEYDOWN:
                 run = False
                 arkanoid.run()
